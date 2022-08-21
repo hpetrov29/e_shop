@@ -1,0 +1,11 @@
+version: '3'
+services:
+  golang_server:
+    build:
+      context: .
+      args:
+        GOLANG_ENV: development
+    environment:
+      - GOLANG_ENV=development
+    env_file:
+      - .env
