@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/fnmzgdt/e_shop/src/posts"
 	"github.com/fnmzgdt/e_shop/src/repositories"
+	"github.com/fnmzgdt/e_shop/src/utils"
 	"github.com/go-chi/chi"
 )
 
 func StartServer() *chi.Mux {
-	port := os.Getenv("PORT")
-	fmt.Println("Starting server on PORT " + port)
+	var (
+		port = utils.GetEnv("PORT", "8000")
+		host = utils.GetEnv("GOLANG_ENV", "127.0.0.1")
+	)
 
 	db, err := repositories.SetupMySQLConnection()
 
@@ -26,7 +28,7 @@ func StartServer() *chi.Mux {
 	router := chi.NewRouter()
 	router.Mount("/api/posts", posts.PostsRoutes(postsService))
 
-	fmt.Println("Server is listening on PORT " + port)
-	log.Fatal(http.ListenAndServe("127.0.0.1:"+port, router))
+	fmt.Println("Server is listening on PORT " + port + ".")
+	log.Fatal(http.ListenAndServe(host+":"+port, router))
 	return router
 }

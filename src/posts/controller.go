@@ -2,21 +2,32 @@ package posts
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
+
+	"github.com/fnmzgdt/e_shop/src/responses"
 )
 
 func writePost(s Service) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var post Post
-		_ = json.NewDecoder(r.Body).Decode(&post)
-		err := s.WritePost(&post)
-		if err == nil {
-			response, _ := json.Marshal("success")
-			w.WriteHeader(200)
-			w.Write(response)
+		if r.Method != http.MethodPost {
+			responses.JSONError(w, "Method type not allowed.", http.StatusMethodNotAllowed)
+			return
 		}
-		fmt.Println(err)
-		return
+		w.Header().Set("Content-Type", "application/json")
+		//get userId from token in middleware
+		post := NewPost(999) //argument = id of writer
+		_ = json.NewDecoder(r.Body).Decode(&post)
+
+		err := post.checkFields()
+		if err != nil {
+			responses.JSONError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		err = s.WritePost(&post)
+		if err != nil {
+			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		responses.JSONResponse(w, "result", "Successful entry.", 200)
 	}
 }

@@ -1,4 +1,4 @@
-FROM golang:latest
+FROM golang:1.18-alpine
 LABEL version="1.0"
 WORKDIR /app
 
@@ -12,5 +12,4 @@ ENV PORT=8000
 EXPOSE $PORT
 
 RUN go build
-
 CMD [ "./e_shop" ]
