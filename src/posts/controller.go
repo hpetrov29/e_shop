@@ -15,7 +15,8 @@ func writePost(s Service) func(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		//get userId from token in middleware
-		post := NewPost(999) //argument = id of writer
+		userId := r.Header.Get("userId")
+		post := NewPost(userId) //argument = id of writer
 		_ = json.NewDecoder(r.Body).Decode(&post)
 
 		err := post.checkFields()
@@ -28,6 +29,7 @@ func writePost(s Service) func(w http.ResponseWriter, r *http.Request) {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		responses.JSONResponse(w, "result", "Successful entry.", 200)
+		responses.JSONResponse(w, "Successful entry.", []Post{post}, 200)
+		return
 	}
 }

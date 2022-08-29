@@ -1,11 +1,13 @@
 package posts
 
+import "database/sql"
+
 type Service interface {
-	WritePost(post *Post) (error)
+	WritePost(post *Post) error
 }
 
 type Rdbms interface {
-	ExecuteQuery(query string, values ...interface{}) error
+	ExecuteQuery(query string, values ...interface{}) (sql.Result, error)
 }
 
 type service struct {
@@ -16,9 +18,9 @@ func NewPostsService(db Rdbms) Service {
 	return &service{db}
 }
 
-func (s *service) WritePost(post *Post) (error) {
+func (s *service) WritePost(post *Post) error {
 	query := "INSERT INTO posts(title, body) VALUES (?, ?)"
-	err := s.mysql.ExecuteQuery(query, post.Title, post.Body)
+	_, err := s.mysql.ExecuteQuery(query, post.Title, post.Body)
 	if err != nil {
 		return err
 	}

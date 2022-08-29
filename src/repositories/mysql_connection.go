@@ -19,7 +19,7 @@ func SetupMySQLConnection() (*MySQLConnection, error) {
 		password = utils.GetEnv("MYSQL_PASSWORD", "")
 		host     = utils.GetEnv("MYSQL_HOST", "localhost")
 	)
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", user, password, host, dbname)) //host.docker.internal for docker dev
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s", user, password, host, dbname)) //host = host.docker.internal for docker dev
 	if err != nil {
 		return nil, err
 	}
@@ -27,15 +27,15 @@ func SetupMySQLConnection() (*MySQLConnection, error) {
 	return &MySQLConnection{db: db}, nil
 }
 
-func (s *MySQLConnection) ExecuteQuery(query string, values ...interface{}) error {
+func (s *MySQLConnection) ExecuteQuery(query string, values ...interface{}) (sql.Result, error) {
 	stmt, err := s.db.Prepare(query)
 	defer stmt.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = stmt.Exec(values...)
+	result, err := stmt.Exec(values...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return result, nil
 }

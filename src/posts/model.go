@@ -9,11 +9,11 @@ import (
 type Post struct {
 	Title     string `json:"title"`
 	Body      string `json:"body"`
-	UserId    int    `json:"userId"`
+	UserId    string `json:"userId"`
 	CreatedAt int64  `json:"createdAt"`
 }
 
-func NewPost(userId int) Post {
+func NewPost(userId string) Post {
 	now := time.Now().Unix()
 	return Post{UserId: userId, CreatedAt: now}
 }
@@ -28,7 +28,7 @@ func (p Post) checkFields() error {
 	if p.CreatedAt == 0 {
 		return errors.New("CreatedAt field can't be a null value.")
 	}
-	if p.UserId == 0 {
+	if p.UserId == "" {
 		return errors.New("UserId field can't be a null value.")
 	}
 	return nil
