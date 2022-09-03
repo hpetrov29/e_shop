@@ -14,10 +14,15 @@ type User struct {
 	CreatedAt int64  `json:"createdAt,omitempty"`
 }
 
+type UserLogin struct {
+	Email    string `json:"email,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
 type UserClaims struct {
-	Email  string `json:"email,omitempty"`
-	UserId string `json:"userId,omitempty"`
-	SessionUUID   string `json:"sessionId,omitempty"`
+	Email       string `json:"email,omitempty"`
+	UserId      string `json:"userId,omitempty"`
+	SessionUUID string `json:"sessionId,omitempty"`
 }
 
 func NewUser() User {
@@ -43,4 +48,15 @@ func isEmailValid(e string) bool {
 func (u *User) createClaims(userId string) UserClaims {
 	sessionId := uuid.New().String()
 	return UserClaims{Email: u.Email, UserId: userId, SessionUUID: sessionId}
+}
+
+func (u *UserClaims) addSessionId() {
+	sessionId := uuid.New().String()
+	u.SessionUUID = sessionId
+}
+
+func (u *UserClaims) deleteSessionId() string {
+	sessionId := u.SessionUUID
+	u.SessionUUID = ""
+	return sessionId
 }

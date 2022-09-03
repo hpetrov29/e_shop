@@ -3,6 +3,7 @@ package users
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/fnmzgdt/e_shop/src/middleware"
@@ -33,32 +34,98 @@ func registerUser(s Service) func(w http.ResponseWriter, r *http.Request) {
 		user.Password = string(password[:])
 		userId, err := s.InsertUser(&user)
 		if err != nil {
+			if strings.Split(err.Error(), ":")[0] == "Error 1062" {
+				responses.JSONError(w, "An account with this email already exists.", http.StatusInternalServerError)
+				return
+			}
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		user.Password = ""
 		claims := user.createClaims(userId)
-		jwt, err := middleware.NewJWT(time.Minute*30, claims)
+		refreshToken, err := middleware.NewJWT(time.Hour*24*356, map[string]interface{}{"sessionId": claims.SessionUUID, "userId": claims.UserId})
 		if err != nil {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		sessionId := claims.SessionUUID
-		claims.SessionUUID = ""
+		accessToken, err := middleware.NewJWT(time.Minute*5, claims)
+		if err != nil {
+			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sessionId := claims.deleteSessionId()
 		claimsJson, err := json.Marshal(claims)
 		if err != nil {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		err = s.CreateSession(userId, sessionId, string(claimsJson))
+		if err = s.CreateSession(userId, sessionId, string(claimsJson)); err != nil {
+			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		refreshCookie := http.Cookie{Name: "refreshToken", Value: refreshToken, Path: "/", Expires: time.Now().Add(time.Hour * 24 * 356), Secure: true, HttpOnly: true}
+		http.SetCookie(w, &refreshCookie)
+
+		accessCookie := http.Cookie{Name: "accessToken", Value: accessToken, Path: "/", Expires: time.Now().Add(time.Minute * 5), Secure: true, HttpOnly: true}
+		http.SetCookie(w, &accessCookie)
+
+		responses.JSONResponse(w, "Successful registration.", []User{user}, 200)
+		return
+	}
+}
+
+func login(s Service) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			responses.JSONError(w, "Method type not allowed.", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		userLogin := UserLogin{}
+		_ = json.NewDecoder(r.Body).Decode(&userLogin)
+		password, err := s.GetPasswordFromEmail(&userLogin)
+		if err != nil {
+			responses.JSONError(w, "Wrong email or password.", http.StatusBadRequest)
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(password), []byte(userLogin.Password)); err != nil {
+			responses.JSONError(w, "Wrong email or password.", http.StatusBadRequest)
+			return
+		}
+		claims, err := s.GetClaimsFromEmail(&userLogin)
 		if err != nil {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		cookie := http.Cookie{Name: "Auth-token", Value: jwt, Path: "/", Expires: time.Now().Add(time.Minute * 60), Secure: true, HttpOnly: true}
-		http.SetCookie(w, &cookie)
+		claims.addSessionId()
+		refreshToken, err := middleware.NewJWT(time.Hour*24*356, map[string]interface{}{"sessionId": claims.SessionUUID, "userId": claims.UserId})
+		if err != nil {
+			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		accessToken, err := middleware.NewJWT(time.Minute*5, *claims)
+		if err != nil {
+			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sessionUUID := claims.deleteSessionId()
+		claimsJson, err := json.Marshal(claims)
+		if err != nil {
+			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err = s.CreateSession(claims.UserId, sessionUUID, string(claimsJson)); err != nil {
+			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-		responses.JSONResponse(w, "Successful registration.", []User{user}, 200)
+		refreshCookie := http.Cookie{Name: "refreshToken", Value: refreshToken, Path: "/", Expires: time.Now().Add(time.Hour * 24 * 356), Secure: true, HttpOnly: true}
+		http.SetCookie(w, &refreshCookie)
+
+		accessCookie := http.Cookie{Name: "accessToken", Value: accessToken, Path: "/", Expires: time.Now().Add(time.Minute * 5), Secure: true, HttpOnly: true}
+		http.SetCookie(w, &accessCookie)
+
+		responses.JSONResponse(w, "Successful Login.", []UserClaims{*claims}, 200)
 		return
 	}
 }

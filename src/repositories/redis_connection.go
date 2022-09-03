@@ -45,8 +45,7 @@ func (r *RedisConnection) GetKey(key string) (string, error) {
 	return result, nil
 }
 
-func (r *RedisConnection) SetKey(key string, value interface{}) error {
+func (r *RedisConnection) SetKey(key string, value interface{}, exp time.Duration) error {
 	ctx := context.Background()
-	exp := time.Duration(600 * time.Second) // 10 minutes
 	return r.client.Set(ctx, key, value, exp).Err()
 }

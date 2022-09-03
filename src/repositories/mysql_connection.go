@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/fnmzgdt/e_shop/src/users"
 	"github.com/fnmzgdt/e_shop/src/utils"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -38,4 +39,23 @@ func (s *MySQLConnection) ExecuteQuery(query string, values ...interface{}) (sql
 		return nil, err
 	}
 	return result, nil
+}
+
+func (s *MySQLConnection) GetPassword(query string, values ...interface{}) (string, error) {
+	var password string
+
+	err := s.db.QueryRow(query, values...).Scan(&password)
+	if err != nil {
+		return "", err
+	}
+	return password, nil
+}
+
+func (s *MySQLConnection) GetUserDetails(query string, values ...interface{}) (*users.UserClaims, error) {
+	userClaims := users.UserClaims{}
+	err := s.db.QueryRow(query, values...).Scan(&userClaims.UserId, &userClaims.Email)
+	if err != nil {
+		return nil, err
+	}
+	return &userClaims, nil
 }

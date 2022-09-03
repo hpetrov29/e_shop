@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/fnmzgdt/e_shop/src/middleware"
 	"github.com/fnmzgdt/e_shop/src/posts"
 	"github.com/fnmzgdt/e_shop/src/repositories"
 	"github.com/fnmzgdt/e_shop/src/users"
@@ -29,9 +30,9 @@ func StartServer() *chi.Mux {
 
 	postsService := posts.NewPostsService(mysql)
 	usersService := users.NewUserssService(mysql, redis)
-
+	middlewareController := middleware.NewMIddlewareController(redis)
 	router := chi.NewRouter()
-	router.Mount("/api/posts", posts.PostsRoutes(postsService))
+	router.Mount("/api/posts", posts.PostsRoutes(postsService, middlewareController))
 	router.Mount("/api/users", users.UsersRoutes(usersService))
 
 	fmt.Println("Server is listening on PORT " + port + ".")

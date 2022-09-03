@@ -25,23 +25,14 @@ func NewJWT(ttl time.Duration, content interface{}) (string, error) {
 }
 
 func Validate(token string) (interface{}, error) {
-	tok, err := jwt.Parse(token, func(jwtToken *jwt.Token) (interface{}, error) {
-		if _, ok := jwtToken.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected method: %s", jwtToken.Header["alg"])
-		}
-
+	//jwt.ParseWithClaims()
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(token, claims, func(jwtToken *jwt.Token) (interface{}, error) {
 		privateKey := utils.GetEnv("JWT_SALT", "")
-
 		return []byte(privateKey), nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("validate: %w", err)
 	}
-
-	claims, ok := tok.Claims.(jwt.MapClaims)
-	if !ok || !tok.Valid {
-		return nil, fmt.Errorf("validate: invalid")
-	}
-
 	return claims["data"], nil
 }
