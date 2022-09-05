@@ -1,6 +1,8 @@
 package middleware
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type Service interface {
 	GetSession(userId string, sessionId string) (*UserClaims, error)

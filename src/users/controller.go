@@ -48,12 +48,12 @@ func registerUser(s Service) func(w http.ResponseWriter, r *http.Request) {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		sessionId := claims.deleteSessionId()
 		accessToken, err := middleware.NewJWT(time.Minute*5, claims)
 		if err != nil {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		sessionId := claims.deleteSessionId()
 		claimsJson, err := json.Marshal(claims)
 		if err != nil {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
@@ -103,12 +103,12 @@ func login(s Service) func(w http.ResponseWriter, r *http.Request) {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		sessionUUID := claims.deleteSessionId()
 		accessToken, err := middleware.NewJWT(time.Minute*5, *claims)
 		if err != nil {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		sessionUUID := claims.deleteSessionId()
 		claimsJson, err := json.Marshal(claims)
 		if err != nil {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)

@@ -7,7 +7,6 @@ import (
 
 func PostsRoutes(s Service, mc M.Controller) *chi.Mux {
 	router := chi.NewRouter()
-	router.Post("/post", M.Authorize(writePost(s)))
-	router.With(mc.Serialize).Post("/postt", writePost(s))
+	router.With(mc.Serialize, mc.Authorize).Post("/post", writePost(s))
 	return router
 }

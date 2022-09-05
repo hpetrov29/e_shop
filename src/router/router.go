@@ -31,9 +31,12 @@ func StartServer() *chi.Mux {
 	postsService := posts.NewPostsService(mysql)
 	usersService := users.NewUserssService(mysql, redis)
 	middlewareController := middleware.NewMIddlewareController(redis)
+
 	router := chi.NewRouter()
+
 	router.Mount("/api/posts", posts.PostsRoutes(postsService, middlewareController))
 	router.Mount("/api/users", users.UsersRoutes(usersService))
+	router.Mount("/api/middleware", middleware.MiddlewareRoutes(middlewareController))
 
 	fmt.Println("Server is listening on PORT " + port + ".")
 	log.Fatal(http.ListenAndServe(host+":"+port, router))
