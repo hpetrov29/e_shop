@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/fnmzgdt/e_shop/src/items"
 	"github.com/fnmzgdt/e_shop/src/users"
 	"github.com/fnmzgdt/e_shop/src/utils"
 	_ "github.com/go-sql-driver/mysql"
@@ -58,4 +59,29 @@ func (s *MySQLConnection) GetUserDetails(query string, values ...interface{}) (*
 		return nil, err
 	}
 	return &userClaims, nil
+}
+
+func (s *MySQLConnection) GetItem(query string, id int) (*items.ItemGet, error) {
+	item := items.ItemGet{}
+	if err := s.db.QueryRow(query, id).Scan(&item.Id, &item.UserId, &item.CategoryId, &item.BrandId, &item.CreatedAt, &item.Price, &item.DiscountedPrice, &item.Description, &item.ModifiedAt); err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (s *MySQLConnection) GetItems(query string, limit int) (*[]items.ItemGet, error) {
+	itemsArray := make([]items.ItemGet, 0)
+	rows, err := s.db.Query(query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		item := new(items.ItemGet)
+		if err := rows.Scan(&item.Id, &item.UserId, &item.CategoryId, &item.BrandId, &item.CreatedAt, &item.Price, &item.DiscountedPrice, &item.Description, &item.ModifiedAt); err != nil {
+			return nil, err
+		}
+		itemsArray = append(itemsArray, *item)
+	}
+	return &itemsArray, nil
 }

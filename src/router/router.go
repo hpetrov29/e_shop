@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/fnmzgdt/e_shop/src/items"
 	"github.com/fnmzgdt/e_shop/src/middleware"
-	"github.com/fnmzgdt/e_shop/src/posts"
 	"github.com/fnmzgdt/e_shop/src/repositories"
 	"github.com/fnmzgdt/e_shop/src/users"
 	"github.com/fnmzgdt/e_shop/src/utils"
@@ -28,13 +28,14 @@ func StartServer() *chi.Mux {
 		fmt.Println(err)
 	}
 
-	postsService := posts.NewPostsService(mysql)
+	postsService := items.NewPostsService(mysql)
 	usersService := users.NewUserssService(mysql, redis)
 	middlewareController := middleware.NewMIddlewareController(redis)
 
 	router := chi.NewRouter()
 
-	router.Mount("/api/posts", posts.PostsRoutes(postsService, middlewareController))
+	router.Use(middlewareController.Serialize)
+	router.Mount("/api/items", items.PostsRoutes(postsService, middlewareController))
 	router.Mount("/api/users", users.UsersRoutes(usersService))
 	router.Mount("/api/middleware", middleware.MiddlewareRoutes(middlewareController))
 

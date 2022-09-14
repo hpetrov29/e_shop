@@ -23,8 +23,11 @@ func NewMiddlewareService(a InMemoryDb) Service {
 func (s *service) GetSession(userId string, sessionId string) (*UserClaims, error) {
 	keyName := "sessions:" + userId + ":" + sessionId
 	result, err := s.redis.GetKey(keyName)
+	if err != nil {
+		return nil, err
+	}
 	claims := &UserClaims{}
-	json.Unmarshal([]byte(result), claims)
+	err = json.Unmarshal([]byte(result), claims)
 	if err != nil {
 		return nil, err
 	}

@@ -10,8 +10,11 @@ import (
 
 type Controller interface {
 	Serialize(http.Handler) http.Handler
-	Authorize(next http.Handler) http.Handler
+	Authorize() Adapter
 	GetAccessToken(w http.ResponseWriter, r *http.Request)
+	AddHeader(key, value string) Adapter
+	CheckMethod(method string) Adapter
+	StaffAuthorize() Adapter
 }
 
 type middlewareController struct {
@@ -21,6 +24,8 @@ type middlewareController struct {
 func NewMIddlewareController(a InMemoryDb) Controller {
 	return &middlewareController{service: &service{redis: a}}
 }
+
+type Adapter func(http.Handler) http.Handler
 
 func (c *middlewareController) GetAccessToken(w http.ResponseWriter, r *http.Request) {
 	refreshCookie, err := r.Cookie("refreshToken")
@@ -86,20 +91,83 @@ func (c *middlewareController) Serialize(next http.Handler) http.Handler {
 			return
 		}
 		userId := payload.(map[string]interface{})["userId"].(string)
+		role := payload.(map[string]interface{})["role"].(string)
+
 		r.Header.Add("userId", userId)
+		r.Header.Add("role", role)
 		next.ServeHTTP(w, r)
 		return
 	})
 }
 
-func (c *middlewareController) Authorize(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userId := r.Header.Get("userId")
-		if userId == "" {
-			responses.JSONError(w, "Action requires authorization", http.StatusUnauthorized)
+func (c *middlewareController) Authorize() Adapter {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userId := r.Header.Get("userId")
+			if userId == "" {
+				responses.JSONError(w, "Action requires authorization", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
 			return
-		}
-		next.ServeHTTP(w, r)
-		return
-	})
+		})
+	}
+}
+
+func (c *middlewareController) AddHeader(key, value string) Adapter {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(key, value)
+			next.ServeHTTP(w, r)
+			return
+		})
+	}
+}
+
+func (c *middlewareController) CheckMethod(method string) Adapter {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch method {
+			case "POST":
+				if r.Method != http.MethodPost {
+					responses.JSONError(w, "Method type not allowed.", http.StatusMethodNotAllowed)
+					return
+				}
+			case "GET":
+				if r.Method != http.MethodGet {
+					responses.JSONError(w, "Method type not allowed.", http.StatusMethodNotAllowed)
+					return
+				}
+			case "PATCH":
+				if r.Method != http.MethodPatch {
+					responses.JSONError(w, "Method type not allowed.", http.StatusMethodNotAllowed)
+					return
+				}
+			case "DELETE":
+				if r.Method != http.MethodDelete {
+					responses.JSONError(w, "Method type not allowed.", http.StatusMethodNotAllowed)
+					return
+				}
+			default:
+				responses.JSONError(w, "Method type not allowed.", http.StatusMethodNotAllowed)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		})
+	}
+}
+
+func (c *middlewareController) StaffAuthorize() Adapter {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role := r.Header.Get("role")
+			if role != "staff" {
+				responses.JSONError(w, "Action requires special staff authorization", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		})
+	}
 }
