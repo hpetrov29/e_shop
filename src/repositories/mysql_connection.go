@@ -25,6 +25,9 @@ func SetupMySQLConnection() (*MySQLConnection, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
 	fmt.Println("Successful conneciton to MySQL.")
 	return &MySQLConnection{db: db}, nil
 }

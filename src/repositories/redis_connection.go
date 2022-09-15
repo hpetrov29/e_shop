@@ -20,19 +20,18 @@ func SetupRedisConnection() (*RedisConnection, error) {
 		password      = utils.GetEnv("REDIS_PASSWORD", "")
 		host          = utils.GetEnv("REDIS_HOST", "localhost:6379")
 	)
-
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("Successful conneciton to Redis.")
-
 	client := redis.NewClient(&redis.Options{
 		Addr:     host,
 		Password: password,
 		DB:       redis_db,
 	})
-
+	if err := client.Ping(context.Background()).Err(); err != nil {
+		return nil, err
+	}
+	fmt.Println("Successful conneciton to Redis.")
 	return &RedisConnection{client}, nil
 }
 
