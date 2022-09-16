@@ -72,9 +72,9 @@ func (s *MySQLConnection) GetItem(query string, id int) (*items.ItemGet, error) 
 	return &item, nil
 }
 
-func (s *MySQLConnection) GetItems(query string, limit int) (*[]items.ItemGet, error) {
+func (s *MySQLConnection) GetItems(query string, values ...interface{}) (*[]items.ItemGet, error) {
 	itemsArray := make([]items.ItemGet, 0)
-	rows, err := s.db.Query(query, limit)
+	rows, err := s.db.Query(query, values...)
 	if err != nil {
 		return nil, err
 	}

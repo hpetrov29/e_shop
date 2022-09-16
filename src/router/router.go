@@ -27,8 +27,13 @@ func StartServer() *chi.Mux {
 	if err != nil {
 		fmt.Println(err)
 	}
+	gcClient, err := repositories.SetupGoogleStorageConnection()
+	if err != nil {
+		fmt.Println(err)
+	}
+	imageBucket := repositories.NewGCBucket(gcClient, "itemsimages")
 
-	postsService := items.NewPostsService(mysql)
+	postsService := items.NewPostsService(mysql, imageBucket)
 	usersService := users.NewUserssService(mysql, redis)
 	middlewareController := middleware.NewMIddlewareController(redis)
 

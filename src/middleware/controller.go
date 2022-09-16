@@ -91,10 +91,11 @@ func (c *middlewareController) Serialize(next http.Handler) http.Handler {
 			return
 		}
 		userId := payload.(map[string]interface{})["userId"].(string)
-		role := payload.(map[string]interface{})["role"].(string)
+		//role := payload.(map[string]interface{})["role"].(string)
 
 		r.Header.Add("userId", userId)
-		r.Header.Add("role", role)
+		//r.Header.Add("role", role)
+
 		next.ServeHTTP(w, r)
 		return
 	})

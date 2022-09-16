@@ -1,45 +1,48 @@
 package items
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
+	"mime/multipart"
 	"strings"
+
+	"github.com/fnmzgdt/e_shop/src/utils"
 )
 
 type Service interface {
 	InsertItem(post *ItemPost) (int, error)
 	GetItem(itemId int) (*ItemGet, error)
-	GetItems(limit int) (*[]ItemGet, error)
+	GetItems(limit int, filter *Filter) (*[]ItemGet, error)
 	UpdateItem(item *ItemPatch) (int, error)
 	DeleteItem(itemId int) (int, error)
-	InsertCategory(category *ItemCategory) (int64, error)
-	DeleteCategory(category *ItemCategory) error
-	InsertBrand(brand *Brand) (int64, error)
-	InsertSize(size *Size) (int, error)
-	DeleteSize(size *Size) error
-	InsertLocation(location *Location) (int, error)
-	DeleteLocation(location *Location) error
-	InsertDiscount(dis *Discount) (int, error)
-	DeleteDiscount(dis *Discount) error
-	InsertItemDiscount(itemdis *ItemDiscount) error
+	UploadItemImage(ctx context.Context, imageFile multipart.File) (string, error)
+	InsertItemImage(imageUrl string) (int, error)
+	InsertItemImageJunction(itemId, imageId, display_order int) (int, error)
 }
 
-type Rdbms interface {
+type MySQL interface {
 	ExecuteQuery(query string, values ...interface{}) (sql.Result, error)
 	GetItem(query string, id int) (*ItemGet, error)
-	GetItems(query string, limit int) (*[]ItemGet, error)
+	GetItems(query string, values ...interface{}) (*[]ItemGet, error)
+}
+
+type GoogleImageBucket interface {
+	UploadImage(ctx context.Context, objName string, imageFile multipart.File) (string, error)
 }
 
 type service struct {
-	mysql Rdbms
+	sqldb       MySQL
+	imageBucket GoogleImageBucket
 }
 
-func NewPostsService(db Rdbms) Service {
-	return &service{db}
+func NewPostsService(sqldb MySQL, cloudstorage GoogleImageBucket) Service {
+	return &service{sqldb, cloudstorage}
 }
 
 func (s *service) InsertItem(item *ItemPost) (int, error) {
 	query := "INSERT INTO items(user_id, category_id, brand_id, created_at, price, discounted_price, description) VALUES (?, ?, ?, FROM_UNIXTIME(?), ?, ?, ?)"
-	res, err := s.mysql.ExecuteQuery(query, item.UserId, item.CategoryId, item.BrandId, item.CreatedAt, item.Price, item.DiscountedPrice, item.Description)
+	res, err := s.sqldb.ExecuteQuery(query, item.UserId, item.CategoryId, item.BrandId, item.CreatedAt, item.Price, item.DiscountedPrice, item.Description)
 	if err != nil {
 		return 0, err
 	}
@@ -52,16 +55,37 @@ func (s *service) InsertItem(item *ItemPost) (int, error) {
 
 func (s *service) GetItem(itemId int) (*ItemGet, error) {
 	query := "SELECT id, user_id, category_id, brand_id, UNIX_TIMESTAMP(created_at), price, discounted_price, description, UNIX_TIMESTAMP(modified_at) FROM items WHERE id = (?) AND deleted_at IS NULL;"
-	item, err := s.mysql.GetItem(query, itemId)
+	item, err := s.sqldb.GetItem(query, itemId)
 	if err != nil {
 		return nil, err
 	}
 	return item, nil
 }
 
-func (s *service) GetItems(limit int) (*[]ItemGet, error) {
-	query := "SELECT id, user_id, category_id, brand_id, UNIX_TIMESTAMP(created_at), price, discounted_price, description, UNIX_TIMESTAMP(modified_at) FROM items WHERE deleted_at IS NULL LIMIT ?;"
-	items, err := s.mysql.GetItems(query, limit)
+func (s *service) GetItems(limit int, filter *Filter) (*[]ItemGet, error) {
+	query := "SELECT id, user_id, category_id, brand_id, UNIX_TIMESTAMP(created_at), price, discounted_price, description, UNIX_TIMESTAMP(modified_at) FROM items WHERE deleted_at IS NULL"
+	//fix sql injection
+	var arguments []interface{}
+	if len(filter.Brand) > 0 {
+		query += " AND brand_id IN ("
+		for i := 0; i < len(filter.Brand); i++ {
+			query += "?, "
+			arguments = append(arguments, filter.Brand[i])
+		}
+		query = strings.TrimSuffix(query, ", ")
+		query += ")"
+	}
+	if len(filter.Prices) == 1 {
+		lowPricehighPrice := strings.Split(filter.Prices[0], "-")
+		lowPrice := lowPricehighPrice[0]
+		highPrice := lowPricehighPrice[1]
+		query += " AND (CASE WHEN discounted_price IS NULL THEN ((price > ?) AND (price < ?)) ELSE ((discounted_price > ?) AND (discounted_price < ?)) END)"
+		arguments = append(arguments, lowPrice, highPrice, lowPrice, highPrice)
+	}
+	query += " LIMIT ?;"
+	arguments = append(arguments, limit)
+	fmt.Println(query)
+	items, err := s.sqldb.GetItems(query, arguments...)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +126,7 @@ func (s *service) UpdateItem(item *ItemPatch) (int, error) {
 	query = strings.TrimSuffix(query, ",")
 	query += " WHERE id = (?);"
 	params = append(params, item.Id)
-	res, err := s.mysql.ExecuteQuery(query, params...)
+	res, err := s.sqldb.ExecuteQuery(query, params...)
 	if err != nil {
 		return 0, err
 	}
@@ -115,7 +139,7 @@ func (s *service) UpdateItem(item *ItemPatch) (int, error) {
 
 func (s *service) DeleteItem(itemId int) (int, error) {
 	query := "DELETE FROM items WHERE id = (?);"
-	res, err := s.mysql.ExecuteQuery(query, itemId)
+	res, err := s.sqldb.ExecuteQuery(query, itemId)
 	if err != nil {
 		return 0, err
 	}
@@ -126,44 +150,21 @@ func (s *service) DeleteItem(itemId int) (int, error) {
 	return int(rowsAffected), nil
 }
 
-func (s *service) InsertCategory(category *ItemCategory) (int64, error) {
-	query := "call shop.add_subcategory(?, ?, ?);"
-	res, err := s.mysql.ExecuteQuery(query, category.Name, category.ParentName, category.UserId)
+func (s *service) UploadItemImage(ctx context.Context, imageFile multipart.File) (string, error) {
+	objName, err := utils.ObjNameFromUrl("")
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	lastId, err := res.LastInsertId()
+	imageUrl, err := s.imageBucket.UploadImage(ctx, objName, imageFile)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	return lastId, nil
+	return imageUrl, nil
 }
 
-func (s *service) DeleteCategory(category *ItemCategory) error {
-	query := "call shop.delete_category(?);"
-	_, err := s.mysql.ExecuteQuery(query, category.Name)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *service) InsertBrand(brand *Brand) (int64, error) {
-	query := "INSERT INTO brands(name, user_id) VALUES(?, ?);"
-	res, err := s.mysql.ExecuteQuery(query, brand.Name, brand.UserId)
-	if err != nil {
-		return 0, err
-	}
-	lastId, err := res.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-	return lastId, nil
-}
-
-func (s *service) InsertSize(size *Size) (int, error) {
-	query := "INSERT INTO sizes(name, user_id) VALUES(?, ?);"
-	res, err := s.mysql.ExecuteQuery(query, size.Name, size.UserId)
+func (s *service) InsertItemImage(imageUrl string) (int, error) {
+	query := "INSERT INTO images(url) VALUES (?);"
+	res, err := s.sqldb.ExecuteQuery(query, imageUrl)
 	if err != nil {
 		return 0, err
 	}
@@ -174,64 +175,15 @@ func (s *service) InsertSize(size *Size) (int, error) {
 	return int(lastId), nil
 }
 
-func (s *service) DeleteSize(size *Size) error {
-	query := "DELETE FROM sizes WHERE name = ?;"
-	_, err := s.mysql.ExecuteQuery(query, size.Name)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *service) InsertLocation(location *Location) (int, error) {
-	query := "INSERT INTO locations(address, user_id) VALUES(?, ?);"
-	res, err := s.mysql.ExecuteQuery(query, location.Address, location.UserId)
+func (s *service) InsertItemImageJunction(itemId, imageId, display_order int) (int, error) { //mysql
+	query := "INSERT INTO items_images(item_id, image_id, display_order) VALUES (?, ?, ?);"
+	res, err := s.sqldb.ExecuteQuery(query, itemId, imageId, display_order)
 	if err != nil {
 		return 0, err
 	}
-	lastId, err := res.LastInsertId()
+	rowsAffected, err := res.RowsAffected()
 	if err != nil {
 		return 0, err
 	}
-	return int(lastId), nil
-}
-
-func (s *service) DeleteLocation(location *Location) error {
-	query := "DELETE FROM locations WHERE id = (?);"
-	_, err := s.mysql.ExecuteQuery(query, location.Id)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *service) InsertDiscount(dis *Discount) (int, error) {
-	query := "INSERT INTO discounts(code, amount, expires_at, user_id) VALUES(?, ?, FROM_UNIXTIME(?), ?);"
-	res, err := s.mysql.ExecuteQuery(query, dis.Code, dis.Amount, dis.ExpiresAt, dis.UserId)
-	if err != nil {
-		return 0, err
-	}
-	lastId, err := res.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-	return int(lastId), nil
-}
-
-func (s *service) DeleteDiscount(dis *Discount) error {
-	query := "DELETE FROM discounts WHERE id = (?);"
-	_, err := s.mysql.ExecuteQuery(query, dis.Id)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *service) InsertItemDiscount(itemdis *ItemDiscount) error {
-	query := "INSERT INTO items_discounts(item_id, discount_id, valid_at) VALUES(?, ?, FROM_UNIXTIME(?));"
-	_, err := s.mysql.ExecuteQuery(query, itemdis.ItemId, itemdis.DiscountId, itemdis.ValidAt)
-	if err != nil {
-		return err
-	}
-	return nil
+	return int(rowsAffected), nil
 }
