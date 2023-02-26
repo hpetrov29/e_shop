@@ -27,22 +27,22 @@ func StartServer() *chi.Mux {
 	if err != nil {
 		fmt.Println(err)
 	}
-	gcClient, err := repositories.SetupGoogleStorageConnection()
+	googleStorage, err := repositories.SetupGoogleStorageConnection()
 	if err != nil {
 		fmt.Println(err)
 	}
-	imageBucket := repositories.NewGCBucket(gcClient, "itemsimages")
+	imageBucket := repositories.NewGCBucket(googleStorage, "itemsimages")
 
 	postsService := items.NewPostsService(mysql, imageBucket)
 	usersService := users.NewUserssService(mysql, redis)
-	middlewareController := middleware.NewMIddlewareController(redis)
+	middlewares := middleware.NewMIddlewareController(redis)
 
 	router := chi.NewRouter()
 
-	router.Use(middlewareController.Serialize)
-	router.Mount("/api/items", items.PostsRoutes(postsService, middlewareController))
+	router.Use(middlewares.Serialize)
+	router.Mount("/api/items", items.PostsRoutes(postsService, middlewares))
 	router.Mount("/api/users", users.UsersRoutes(usersService))
-	router.Mount("/api/middleware", middleware.MiddlewareRoutes(middlewareController))
+	router.Mount("/api/middleware", middleware.MiddlewareRoutes(middlewares))
 
 	fmt.Println("Server is listening on PORT " + port + ".")
 	log.Fatal(http.ListenAndServe(host+":"+port, router))

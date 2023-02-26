@@ -30,6 +30,12 @@ func getItem(s Service) func(w http.ResponseWriter, r *http.Request) {
 			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		images, err := s.GetImages(itemId)
+		if err != nil {
+			responses.JSONError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		item.Images = *images
 		responses.JSONResponse(w, "Success.", []ItemGet{*item}, http.StatusOK)
 		return
 	}
@@ -74,7 +80,7 @@ func postItem(s Service) func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		userId, _ := strconv.Atoi(r.Header.Get("userId"))
-		//check images before inserting item in db
+		//checking the images before inserting item in db
 		files := r.MultipartForm.File["imageFile"]
 		if len(files) > 20 {
 			responses.JSONError(w, "You can upload up to 20 images at once.", http.StatusBadRequest)
@@ -100,6 +106,7 @@ func postItem(s Service) func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		item.Id = lastId
+		imageArray := make([]Image, 0)
 		for i := range files {
 			file, err := files[i].Open()
 			defer file.Close()
@@ -122,7 +129,9 @@ func postItem(s Service) func(w http.ResponseWriter, r *http.Request) {
 				responses.JSONError(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			imageArray = append(imageArray, Image{Url: imageUrl})
 		}
+		item.Images = imageArray
 		responses.JSONResponse(w, "Successful entry.", []ItemPost{item}, http.StatusCreated)
 		return
 	}
@@ -174,6 +183,7 @@ func deleteItem(s Service) func(w http.ResponseWriter, r *http.Request) {
 			responses.JSONResponse(w, fmt.Sprintf("Successfully updated %d rows", rowsAffected), nil, http.StatusNoContent)
 			return
 		}
+		//delete images related to the item
 		responses.JSONResponse(w, fmt.Sprintf("Successfully updated %d rows", rowsAffected), nil, http.StatusOK)
 		return
 	}

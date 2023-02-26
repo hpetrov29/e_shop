@@ -66,10 +66,27 @@ func (s *MySQLConnection) GetUserDetails(query string, values ...interface{}) (*
 
 func (s *MySQLConnection) GetItem(query string, id int) (*items.ItemGet, error) {
 	item := items.ItemGet{}
-	if err := s.db.QueryRow(query, id).Scan(&item.Id, &item.UserId, &item.CategoryId, &item.BrandId, &item.CreatedAt, &item.Price, &item.DiscountedPrice, &item.Description, &item.ModifiedAt); err != nil {
+	if err := s.db.QueryRow(query, id).Scan(&item.Id, &item.UserId, &item.CategoryName, &item.BrandName, &item.CreatedAt, &item.Price, &item.DiscountedPrice, &item.Description, &item.ModifiedAt); err != nil {
 		return nil, err
 	}
 	return &item, nil
+}
+
+func (s *MySQLConnection) GetImages(query string, itemId int) (*[]items.Image, error) {
+	imagesArray := make([]items.Image, 0)
+	rows, err := s.db.Query(query, itemId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		image := new(items.Image)
+		if err := rows.Scan(&image.Url); err != nil {
+			return nil, err
+		}
+		imagesArray = append(imagesArray, *image)
+	}
+	return &imagesArray, nil
 }
 
 func (s *MySQLConnection) GetItems(query string, values ...interface{}) (*[]items.ItemGet, error) {
@@ -81,7 +98,8 @@ func (s *MySQLConnection) GetItems(query string, values ...interface{}) (*[]item
 	defer rows.Close()
 	for rows.Next() {
 		item := new(items.ItemGet)
-		if err := rows.Scan(&item.Id, &item.UserId, &item.CategoryId, &item.BrandId, &item.CreatedAt, &item.Price, &item.DiscountedPrice, &item.Description, &item.ModifiedAt); err != nil {
+		item.Images = make([]items.Image, 1)
+		if err := rows.Scan(&item.Id, &item.UserId, &item.CategoryName, &item.BrandName, &item.CreatedAt, &item.Price, &item.DiscountedPrice, &item.Description, &item.ModifiedAt, &item.Images[0].Url); err != nil {
 			return nil, err
 		}
 		itemsArray = append(itemsArray, *item)

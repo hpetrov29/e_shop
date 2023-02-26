@@ -8,7 +8,7 @@ import (
 	"github.com/fnmzgdt/e_shop/src/responses"
 )
 
-type Controller interface {
+type Middleware interface {
 	Serialize(http.Handler) http.Handler
 	Authorize() Adapter
 	GetAccessToken(w http.ResponseWriter, r *http.Request)
@@ -21,7 +21,7 @@ type middlewareController struct {
 	service Service
 }
 
-func NewMIddlewareController(a InMemoryDb) Controller {
+func NewMIddlewareController(a InMemoryDb) Middleware {
 	return &middlewareController{service: &service{redis: a}}
 }
 

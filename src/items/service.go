@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"mime/multipart"
+	"strconv"
 	"strings"
 
 	"github.com/fnmzgdt/e_shop/src/utils"
@@ -13,6 +14,7 @@ import (
 type Service interface {
 	InsertItem(post *ItemPost) (int, error)
 	GetItem(itemId int) (*ItemGet, error)
+	GetImages(itemId int) (*[]Image, error)
 	GetItems(limit int, filter *Filter) (*[]ItemGet, error)
 	UpdateItem(item *ItemPatch) (int, error)
 	DeleteItem(itemId int) (int, error)
@@ -25,6 +27,7 @@ type MySQL interface {
 	ExecuteQuery(query string, values ...interface{}) (sql.Result, error)
 	GetItem(query string, id int) (*ItemGet, error)
 	GetItems(query string, values ...interface{}) (*[]ItemGet, error)
+	GetImages(query string, itemId int) (*[]Image, error)
 }
 
 type GoogleImageBucket interface {
@@ -41,7 +44,7 @@ func NewPostsService(sqldb MySQL, cloudstorage GoogleImageBucket) Service {
 }
 
 func (s *service) InsertItem(item *ItemPost) (int, error) {
-	query := "INSERT INTO items(user_id, category_id, brand_id, created_at, price, discounted_price, description) VALUES (?, ?, ?, FROM_UNIXTIME(?), ?, ?, ?)"
+	query := "INSERT INTO items(user_id, category_id, brand_id, created_at, price, discounted_price, description) VALUES (?, ?, ?, FROM_UNIXTIME(?), ?, NULLIF(?, 0), ?)"
 	res, err := s.sqldb.ExecuteQuery(query, item.UserId, item.CategoryId, item.BrandId, item.CreatedAt, item.Price, item.DiscountedPrice, item.Description)
 	if err != nil {
 		return 0, err
@@ -54,7 +57,7 @@ func (s *service) InsertItem(item *ItemPost) (int, error) {
 }
 
 func (s *service) GetItem(itemId int) (*ItemGet, error) {
-	query := "SELECT id, user_id, category_id, brand_id, UNIX_TIMESTAMP(created_at), price, discounted_price, description, UNIX_TIMESTAMP(modified_at) FROM items WHERE id = (?) AND deleted_at IS NULL;"
+	query := "SELECT i.id, i.user_id, c.name as gategory_name, b.name as brand_name, UNIX_TIMESTAMP(created_at), price, discounted_price, description, UNIX_TIMESTAMP(modified_at) FROM items i JOIN categories c ON i.category_id = c.id JOIN brands b ON i.brand_id = b.id WHERE i.id = (?) AND i.deleted_at IS NULL;"
 	item, err := s.sqldb.GetItem(query, itemId)
 	if err != nil {
 		return nil, err
@@ -62,18 +65,33 @@ func (s *service) GetItem(itemId int) (*ItemGet, error) {
 	return item, nil
 }
 
+func (s *service) GetImages(itemId int) (*[]Image, error) {
+	query := "SELECT url FROM items_images JOIN images ON items_images.image_id = images.id WHERE items_images.item_id = (?) ORDER BY display_order ASC;"
+	images, err := s.sqldb.GetImages(query, itemId)
+	if err != nil {
+		return nil, err
+	}
+	return images, nil
+}
+
 func (s *service) GetItems(limit int, filter *Filter) (*[]ItemGet, error) {
-	query := "SELECT id, user_id, category_id, brand_id, UNIX_TIMESTAMP(created_at), price, discounted_price, description, UNIX_TIMESTAMP(modified_at) FROM items WHERE deleted_at IS NULL"
-	//fix sql injection
+	query := "SELECT items.id, items.user_id, categories.name, brands.name, UNIX_TIMESTAMP(created_at), price, discounted_price, description, UNIX_TIMESTAMP(modified_at), images.url FROM items JOIN brands ON items.brand_id = brands.id JOIN categories ON items.category_id = categories.id LEFT JOIN items_images ON items.id = items_images.item_id LEFT JOIN images ON items_images.image_id = images.id WHERE deleted_at IS NULL AND items_images.display_order = 0"
 	var arguments []interface{}
 	if len(filter.Brand) > 0 {
 		query += " AND brand_id IN ("
-		for i := 0; i < len(filter.Brand); i++ {
-			query += "?, "
-			arguments = append(arguments, filter.Brand[i])
+		brandQueryParams := strings.Split(filter.Brand[0], ",")
+		for i := range brandQueryParams {
+			if brandId, err := strconv.Atoi(brandQueryParams[i]); err == nil {
+				query += "?, "
+				arguments = append(arguments, brandId)
+			}
 		}
-		query = strings.TrimSuffix(query, ", ")
-		query += ")"
+		if len(arguments) == 0 {
+			query = strings.TrimSuffix(query, " AND brand_id IN (")
+		} else {
+			query = strings.TrimSuffix(query, ", ")
+			query += ")"
+		}
 	}
 	if len(filter.Prices) == 1 {
 		lowPricehighPrice := strings.Split(filter.Prices[0], "-")

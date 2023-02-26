@@ -6,28 +6,34 @@ import (
 	"time"
 )
 
+type Image struct {
+	Url string `json:"url,omitempty"`
+}
+
 type ItemGet struct {
-	Id              int    `json:"id,omitempty"`
-	UserId          int    `json:"userId,omitempty"`
-	CategoryId      int    `json:"categoryId,omitempty"`
-	BrandId         int    `json:"brandId,omitempty"`
-	CreatedAt       int    `json:"createdAt,omitempty"`
-	Price           int    `json:"price,omitempty"`
-	DiscountedPrice int    `json:"discountedPrice,omitempty"`
-	Description     string `json:"description,omitempty"`
-	ModifiedAt      int    `json:"modifiedAt,omitempty"`
-	DeletedAt       int    `json:"deletedAt,omitempty"`
+	Id              int     `json:"id,omitempty"`
+	UserId          int     `json:"userId,omitempty"`
+	CategoryName    string  `json:"categoryName,omitempty"`
+	BrandName       string  `json:"brandName,omitempty"`
+	Images          []Image `json:"images,omitempty"`
+	CreatedAt       int     `json:"createdAt,omitempty"`
+	Price           int     `json:"price,omitempty"`
+	DiscountedPrice *int    `json:"discountedPrice"`
+	Description     string  `json:"description,omitempty"`
+	ModifiedAt      *int    `json:"modifiedAt"`
+	DeletedAt       int     `json:"deletedAt,omitempty"`
 }
 
 type ItemPost struct {
-	Id              int    `json:"id,omitempty"`
-	UserId          int    `json:"userId,omitempty"`
-	CategoryId      int    `json:"categoryId,omitempty"`
-	BrandId         int    `json:"brandId,omitempty"`
-	CreatedAt       int    `json:"createdAt,omitempty"`
-	Price           int    `json:"price,omitempty"`
-	DiscountedPrice int    `json:"discountedPrice,omitempty"`
-	Description     string `json:"description,omitempty"`
+	Id              int     `json:"id,omitempty"`
+	UserId          int     `json:"userId,omitempty"`
+	CategoryId      int     `json:"categoryId,omitempty"`
+	BrandId         int     `json:"brandId,omitempty"`
+	Images          []Image `json:"images,omitempty"`
+	CreatedAt       int     `json:"createdAt,omitempty"`
+	Price           int     `json:"price,omitempty"`
+	DiscountedPrice int     `json:"discountedPrice,omitempty"`
+	Description     string  `json:"description,omitempty"`
 }
 
 func NewItemPost(userId int) ItemPost {
@@ -89,6 +95,6 @@ func (item ItemPatch) checkFields() error {
 }
 
 type Filter struct {
-	Brand []string `json:"brand,omitempty"`
-	Prices []string  `json:"prices,omitempty"`
+	Brand  []string `json:"brand,omitempty"`
+	Prices []string `json:"prices,omitempty"`
 }
