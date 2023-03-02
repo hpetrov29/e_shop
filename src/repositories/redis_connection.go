@@ -10,11 +10,11 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-type RedisConnection struct {
+type CacheConnection struct {
 	client *redis.Client
 }
 
-func SetupRedisConnection() (*RedisConnection, error) {
+func SetupCacheConnection() (*CacheConnection, error) {
 	var (
 		redis_db, err = strconv.Atoi(utils.GetEnv("REDIS_DB_ID", ""))
 		password      = utils.GetEnv("REDIS_PASSWORD", "")
@@ -32,10 +32,10 @@ func SetupRedisConnection() (*RedisConnection, error) {
 		return nil, err
 	}
 	fmt.Println("Successful conneciton to Redis.")
-	return &RedisConnection{client}, nil
+	return &CacheConnection{client}, nil
 }
 
-func (r *RedisConnection) GetKey(key string) (string, error) {
+func (r *CacheConnection) GetKey(key string) (string, error) {
 	ctx := context.Background()
 	result, err := r.client.Get(ctx, key).Result()
 	if err != nil {
@@ -44,7 +44,7 @@ func (r *RedisConnection) GetKey(key string) (string, error) {
 	return result, nil
 }
 
-func (r *RedisConnection) SetKey(key string, value interface{}, exp time.Duration) error {
+func (r *CacheConnection) SetKey(key string, value interface{}, exp time.Duration) error {
 	ctx := context.Background()
 	return r.client.Set(ctx, key, value, exp).Err()
 }

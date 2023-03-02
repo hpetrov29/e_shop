@@ -12,7 +12,7 @@ import (
 	"github.com/fnmzgdt/e_shop/src/utils"
 )
 
-func SetupGoogleStorageConnection() (*storage.Client, error) {
+func SetupCloudStorageConnection() (*storage.Client, error) {
 	fmt.Println("Connecting to Cloud Storage")
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -24,23 +24,23 @@ func SetupGoogleStorageConnection() (*storage.Client, error) {
 	return storage, nil
 }
 
-func (bucket GCBucket) CloseConnection() error {
+func (bucket *CloudBucket) CloseConnection() error {
 	if err := bucket.Client.Close(); err != nil {
 		return fmt.Errorf("Error while closing Google Storage Client: %w", err)
 	}
 	return nil
 }
 
-type GCBucket struct {
+type CloudBucket struct {
 	Client     *storage.Client
 	BucketName string
 }
 
-func NewGCBucket(gcClient *storage.Client, bucketName string) *GCBucket {
-	return &GCBucket{Client: gcClient, BucketName: bucketName}
+func NewCloudBucket(gcClient *storage.Client, bucketName string) *CloudBucket {
+	return &CloudBucket{Client: gcClient, BucketName: bucketName}
 }
 
-func (b *GCBucket) UploadImage(ctx context.Context, objName string, imageFile multipart.File) (string, error) {
+func (b *CloudBucket) UploadImage(ctx context.Context, objName string, imageFile multipart.File) (string, error) {
 	bucket := b.Client.Bucket(b.BucketName)
 	object := bucket.Object(objName)
 	writer := object.NewWriter(ctx)
@@ -56,7 +56,7 @@ func (b *GCBucket) UploadImage(ctx context.Context, objName string, imageFile mu
 	return imageUrl, nil
 }
 
-func (b *GCBucket) DeleteImage(ctx context.Context, objName string) error {
+func (b *CloudBucket) DeleteImage(ctx context.Context, objName string) error {
 	bucket := b.Client.Bucket(b.BucketName)
 	object := bucket.Object(objName)
 	if err := object.Delete(ctx); err != nil {

@@ -4,9 +4,10 @@ import (
 	"github.com/go-chi/chi"
 )
 
-func UsersRoutes(s Service) *chi.Mux {
+func NewUsersRouter(s Service) *chi.Mux {
 	router := chi.NewRouter()
-	router.Post("/user", registerUser(s))
-	router.Post("/login", login(s))
+	handler := newHandler(s)
+	router.Post("/user", handler.registerUser)
+	router.Post("/login", handler.login)
 	return router
 }

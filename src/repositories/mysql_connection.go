@@ -10,11 +10,11 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type MySQLConnection struct {
+type SqlConnection struct {
 	db *sql.DB
 }
 
-func SetupMySQLConnection() (*MySQLConnection, error) {
+func SetupSqlConnection() (*SqlConnection, error) {
 	var (
 		dbname   = utils.GetEnv("MYSQL_DB_NAME", "")
 		user     = utils.GetEnv("MYSQL_USER", "root")
@@ -29,10 +29,10 @@ func SetupMySQLConnection() (*MySQLConnection, error) {
 		return nil, err
 	}
 	fmt.Println("Successful conneciton to MySQL.")
-	return &MySQLConnection{db: db}, nil
+	return &SqlConnection{db: db}, nil
 }
 
-func (s *MySQLConnection) ExecuteQuery(query string, values ...interface{}) (sql.Result, error) {
+func (s *SqlConnection) ExecuteQuery(query string, values ...interface{}) (sql.Result, error) {
 	stmt, err := s.db.Prepare(query)
 	defer stmt.Close()
 	if err != nil {
@@ -45,7 +45,7 @@ func (s *MySQLConnection) ExecuteQuery(query string, values ...interface{}) (sql
 	return result, nil
 }
 
-func (s *MySQLConnection) GetPassword(query string, values ...interface{}) (string, error) {
+func (s *SqlConnection) GetPassword(query string, values ...interface{}) (string, error) {
 	var password string
 
 	err := s.db.QueryRow(query, values...).Scan(&password)
@@ -55,7 +55,7 @@ func (s *MySQLConnection) GetPassword(query string, values ...interface{}) (stri
 	return password, nil
 }
 
-func (s *MySQLConnection) GetUserDetails(query string, values ...interface{}) (*users.UserClaims, error) {
+func (s *SqlConnection) GetUserDetails(query string, values ...interface{}) (*users.UserClaims, error) {
 	userClaims := users.UserClaims{}
 	err := s.db.QueryRow(query, values...).Scan(&userClaims.UserId, &userClaims.Email)
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *MySQLConnection) GetUserDetails(query string, values ...interface{}) (*
 	return &userClaims, nil
 }
 
-func (s *MySQLConnection) GetItem(query string, id int) (*items.ItemGet, error) {
+func (s *SqlConnection) GetItem(query string, id int) (*items.ItemGet, error) {
 	item := items.ItemGet{}
 	if err := s.db.QueryRow(query, id).Scan(&item.Id, &item.UserId, &item.CategoryName, &item.BrandName, &item.CreatedAt, &item.Price, &item.DiscountedPrice, &item.Description, &item.ModifiedAt); err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (s *MySQLConnection) GetItem(query string, id int) (*items.ItemGet, error) 
 	return &item, nil
 }
 
-func (s *MySQLConnection) GetImages(query string, itemId int) (*[]items.Image, error) {
+func (s *SqlConnection) GetImages(query string, itemId int) (*[]items.Image, error) {
 	imagesArray := make([]items.Image, 0)
 	rows, err := s.db.Query(query, itemId)
 	if err != nil {
@@ -89,7 +89,7 @@ func (s *MySQLConnection) GetImages(query string, itemId int) (*[]items.Image, e
 	return &imagesArray, nil
 }
 
-func (s *MySQLConnection) GetItems(query string, values ...interface{}) (*[]items.ItemGet, error) {
+func (s *SqlConnection) GetItems(query string, values ...interface{}) (*[]items.ItemGet, error) {
 	itemsArray := make([]items.ItemGet, 0)
 	rows, err := s.db.Query(query, values...)
 	if err != nil {
